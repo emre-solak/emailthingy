@@ -1,0 +1,111 @@
+
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { Input } from "./ui/input";
+import React, { useState, useEffect } from "react";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { motion } from "framer-motion";
+import { signIn, signOut, useSession } from "next-auth/react";
+
+export default function Dashboard() {
+  const { data: session } = useSession();
+  const [organizationUsers, setOrganizationUsers] = useState([]);
+  const [userRole, setUserRole] = useState("user");
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const response = await fetch("/api/fetchUserRole");
+        const data = await response.json();
+        setUserRole(data.role);
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+      }
+    };
+    fetchUserRole();
+  }, []);
+
+  useEffect(() => {
+    const fetchOrganizationUsers = async () => {
+      try {
+        const response = await fetch("/api/fetchOrganizationUsers");
+        const data = await response.json();
+        setOrganizationUsers(data);
+      } catch (error) {
+        console.error("Error fetching organization users:", error);
+      }
+    };
+    fetchOrganizationUsers();
+  }, []);
+
+  const updateUserRole = async (userId, newRole) => {
+    try {
+      await fetch("/api/updateUserRole", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      setOrganizationUsers((prev) =>
+        prev.map((user) => (user.id === userId ? { ...user, role: newRole } : user))
+      );
+    } catch (error) {
+      console.error("Error updating user role:", error);
+    }
+  };
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <h1 className="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
+        <div className="flex gap-4">
+          <Button onClick={() => signIn("google", { scope: "https://www.googleapis.com/auth/gmail.readonly" })} className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 text-lg">
+            Sign in with Google
+          </Button>
+          <Button onClick={() => signIn("azure-ad", { scope: "Mail.Read Mail.ReadWrite" })} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 text-lg">
+            Sign in with Office 365
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-6">
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="max-w-3xl w-full">
+        <h1 className="text-4xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
+        <p className="text-lg text-gray-600 mb-8">Manage organization users and roles.</p>
+
+        {userRole === "admin" && (
+          <Card className="shadow-lg p-6 bg-white w-full mt-6">
+            <CardContent>
+              <h2 className="text-xl font-semibold mb-4">Manage Organization Users</h2>
+              <ul>
+                {organizationUsers.map((user, index) => (
+                  <li key={index} className="border-b py-2 flex justify-between items-center">
+                    <span>{user.name} - {user.email} ({user.role})</span>
+                    <div className="flex gap-2">
+                      <Button onClick={() => updateUserRole(user.id, "user")} className="bg-gray-500 text-white px-4 py-2 text-sm">
+                        Set as User
+                      </Button>
+                      <Button onClick={() => updateUserRole(user.id, "admin")} className="bg-blue-600 text-white px-4 py-2 text-sm">
+                        Set as Admin
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="mt-6 flex justify-between w-full">
+          <Button onClick={() => signOut()} className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 text-lg">
+            Sign Out
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
